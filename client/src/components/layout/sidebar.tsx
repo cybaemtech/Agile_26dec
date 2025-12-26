@@ -123,6 +123,13 @@ export function Sidebar({
               const Icon = item.icon;
               const isActive = item.isActive(location);
               
+              // Only show Daily Standup for ADMIN and SCRUM_MASTER
+              if (item.label === "Daily Standup" && user) {
+                if (user.role !== "ADMIN" && user.role !== "SCRUM_MASTER") {
+                  return null;
+                }
+              }
+
               return (
                 <li key={item.href}>
                   <Link href={item.href}>

@@ -212,7 +212,7 @@ export default function ProjectBugReports() {
 
   return (
     <div className="flex h-screen bg-neutral-50">
-      <Sidebar />
+      <Sidebar user={currentUser} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header
           user={currentUser}

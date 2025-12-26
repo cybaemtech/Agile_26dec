@@ -259,21 +259,23 @@ export default function Teams() {
         
         <main className="flex-1 overflow-auto">
           <div className="p-6">
-            <div className="mb-8">
+            <div className="mb-4">
               <h1 className="text-2xl font-semibold mb-1">Team Management</h1>
-              <p className="text-neutral-600">Manage your teams, members, and organizational users</p>
+              <p className="text-neutral-600 text-sm">Manage your teams, members, and organizational users</p>
             </div>
 
             <Tabs defaultValue="teams" className="w-full">
-              <TabsList className="bg-muted/30 p-1 mb-8">
+              <TabsList className="bg-muted/30 p-1 mb-4">
                 <TabsTrigger value="teams" className="px-8 py-2">
                   <Users className="h-4 w-4 mr-2" />
                   Teams ({teams.length})
                 </TabsTrigger>
-                <TabsTrigger value="users" className="px-8 py-2">
-                  <UserRound className="h-4 w-4 mr-2" />
-                  All Users ({users.length})
-                </TabsTrigger>
+                {isAdminOrScrum && (
+                  <TabsTrigger value="users" className="px-8 py-2">
+                    <UserRound className="h-4 w-4 mr-2" />
+                    All Users ({users.length})
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="teams" className="focus-visible:outline-none">

@@ -471,6 +471,13 @@ function createWorkItem($conn) {
     } else {
         $input = json_decode(file_get_contents('php://input'), true);
         $screenshotBlob = null;
+        // If screenshot is present and looks like a data URL, decode and store as binary
+        if (isset($input['screenshot']) && is_string($input['screenshot']) && strpos($input['screenshot'], 'base64,') !== false) {
+            $base64 = explode('base64,', $input['screenshot'], 2)[1] ?? '';
+            $screenshotBlob = base64_decode($base64);
+            // Remove screenshot from input so it doesn't get stored in the text column
+            $input['screenshot'] = null;
+        }
     }
 
     // Debug logging
@@ -631,6 +638,7 @@ function createWorkItem($conn) {
         }
 
         // Insert work item with proper updated_by tracking
+        // Add screenshot_blob to insert if present
         error_log("Preparing to insert work item with data:");
         error_log("External ID: " . $externalId);
         error_log("Title: " . $title);
@@ -666,14 +674,14 @@ function createWorkItem($conn) {
                     external_id, title, description, tags, type, status, priority,
                     project_id, parent_id, assignee_id, reporter_id, last_updated_by, estimate,
                     start_date, end_date, completed_at, github_url, bug_type, current_behavior, expected_behavior,
-                    severity, estimated_hours, actual_hours, reference_url, screenshot, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    severity, estimated_hours, actual_hours, reference_url, screenshot, screenshot_blob, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             ");
             $executeParams = [
                 $externalId, $title, $description, $tags, $type, $status, $priority,
                 $projectId, $parentId, $assigneeId, $reporterId, $reporterId, $estimate,
                 $startDate, $endDate, null, $githubUrl, $bugType, $currentBehavior, $expectedBehavior,
-                $severity, $estimatedHours, $actualHours, $referenceUrl, $screenshot
+                $severity, $estimatedHours, $actualHours, $referenceUrl, null, $screenshotBlob
             ];
             error_log("Executing INSERT with parameters: " . json_encode($executeParams));
             $success = $stmt->execute($executeParams);
@@ -688,14 +696,14 @@ function createWorkItem($conn) {
                     external_id, title, description, tags, type, status, priority,
                     project_id, parent_id, assignee_id, reporter_id, updated_by, estimate,
                     start_date, end_date, completed_at, github_url, bug_type, current_behavior, expected_behavior,
-                    severity, estimated_hours, actual_hours, reference_url, screenshot, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    severity, estimated_hours, actual_hours, reference_url, screenshot, screenshot_blob, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             ");
             $executeParams = [
                 $externalId, $title, $description, $tags, $type, $status, $priority,
                 $projectId, $parentId, $assigneeId, $reporterId, $reporterId, $estimate,
                 $startDate, $endDate, null, $githubUrl, $bugType, $currentBehavior, $expectedBehavior,
-                $severity, $estimatedHours, $actualHours, $referenceUrl, $screenshot
+                $severity, $estimatedHours, $actualHours, $referenceUrl, null, $screenshotBlob
             ];
             error_log("Executing INSERT with parameters: " . json_encode($executeParams));
             $success = $stmt->execute($executeParams);
@@ -710,14 +718,14 @@ function createWorkItem($conn) {
                     external_id, title, description, tags, type, status, priority,
                     project_id, parent_id, assignee_id, reporter_id, estimate,
                     start_date, end_date, completed_at, github_url, bug_type, current_behavior, expected_behavior,
-                    severity, estimated_hours, actual_hours, reference_url, screenshot, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    severity, estimated_hours, actual_hours, reference_url, screenshot, screenshot_blob, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             ");
             $executeParams = [
                 $externalId, $title, $description, $tags, $type, $status, $priority,
                 $projectId, $parentId, $assigneeId, $reporterId, $estimate,
                 $startDate, $endDate, null, $githubUrl, $bugType, $currentBehavior, $expectedBehavior,
-                $severity, $estimatedHours, $actualHours, $referenceUrl, $screenshot
+                $severity, $estimatedHours, $actualHours, $referenceUrl, null, $screenshotBlob
             ];
             error_log("Executing INSERT with parameters: " . json_encode($executeParams));
             $success = $stmt->execute($executeParams);

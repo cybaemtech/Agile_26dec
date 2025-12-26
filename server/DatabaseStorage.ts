@@ -333,7 +333,8 @@ export class DatabaseStorage implements IStorage {
       externalId,
       createdByName,
       createdByEmail,
-      screenshot: insertWorkItem.screenshot || null,
+      screenshot: null, // Don't store in screenshot column
+      screenshotBlob: insertWorkItem.screenshot || null, // Store in screenshot_blob column
       screenshotPath: insertWorkItem.screenshotPath || null,
       updatedAt: new Date(),
     });
