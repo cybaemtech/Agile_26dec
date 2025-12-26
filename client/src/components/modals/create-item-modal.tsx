@@ -402,8 +402,9 @@ export function CreateItemModal({
           await new Promise<void>((resolve, reject) => {
             reader.onload = () => {
               const base64String = reader.result as string;
-              // Store base64 screenshot (data URI)
-              submitData.screenshot = base64String;
+              // Store in screenshotBlob column
+              submitData.screenshot = null;
+              submitData.screenshotBlob = base64String;
               // Generate a filename for the screenshot
               const timestamp = new Date().getTime();
               const filename = `screenshot_${timestamp}_${selectedFile.name}`;
@@ -573,29 +574,6 @@ export function CreateItemModal({
                 <div className="grid grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Priority <span className="text-red-500">*</span></FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger className="h-9 text-sm">
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="LOW">Low</SelectItem>
-                            <SelectItem value="MEDIUM">Medium</SelectItem>
-                            <SelectItem value="HIGH">High</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="bugType"
                     render={({ field }) => (
                       <FormItem>
@@ -610,6 +588,29 @@ export function CreateItemModal({
                             <SelectItem value="BUG">Bug (Low)</SelectItem>
                             <SelectItem value="DEFECT">Defect (Medium)</SelectItem>
                             <SelectItem value="PROD_INCIDENT">Prod Incident (High)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Priority <span className="text-red-500">*</span></FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="h-9 text-sm">
+                              <SelectValue placeholder="Select priority" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="LOW">Low</SelectItem>
+                            <SelectItem value="MEDIUM">Medium</SelectItem>
+                            <SelectItem value="HIGH">High</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -743,9 +744,28 @@ export function CreateItemModal({
                     <label htmlFor="screenshot-input" className="cursor-pointer">
                       <div className="text-neutral-600 dark:text-neutral-400">
                         {selectedFile ? (
-                          <div>
+                          <div className="relative group">
                             <p className="font-medium text-green-600">{selectedFile.name}</p>
                             <p className="text-sm">Click or drag to change</p>
+                            <img
+                              src={URL.createObjectURL(selectedFile)}
+                              alt="Preview"
+                              className="max-h-32 mt-2 mx-auto border rounded"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSelectedFile(null);
+                              }}
+                            >
+                              <span className="sr-only">Remove</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            </Button>
                           </div>
                         ) : (
                           <div>

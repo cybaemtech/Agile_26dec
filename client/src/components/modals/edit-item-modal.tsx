@@ -235,6 +235,15 @@ export function EditItemModal({
       const startDateFormatted = formatLocalDateForInput(displayWorkItem.startDate);
       const endDateFormatted = formatLocalDateForInput(displayWorkItem.endDate);
 
+      console.log("📋 Setting form values from displayWorkItem:", {
+        currentBehavior: displayWorkItem.currentBehavior,
+        expectedBehavior: displayWorkItem.expectedBehavior,
+        bugType: displayWorkItem.bugType,
+        severity: displayWorkItem.severity
+      });
+
+      // Map both possible snake_case and camelCase field names from backend response
+      const itemData = displayWorkItem as any;
       const formData: WorkItemFormValues = {
         title: displayWorkItem.title,
         description: displayWorkItem.description || "",
@@ -249,25 +258,53 @@ export function EditItemModal({
         endDate: endDateFormatted,
         projectId: displayWorkItem.projectId,
         type: displayWorkItem.type,
-        bugType: (displayWorkItem.bugType || "BUG") as string,
-        severity: (displayWorkItem.severity || "LOW") as string,
-        currentBehavior: displayWorkItem.currentBehavior || "",
-        expectedBehavior: displayWorkItem.expectedBehavior || "",
-        referenceUrl: displayWorkItem.referenceUrl || "",
+        bugType: itemData.bugType || itemData.bug_type || "BUG",
+        severity: itemData.severity || "LOW",
+        currentBehavior: itemData.currentBehavior || itemData.current_behavior || "",
+        expectedBehavior: itemData.expectedBehavior || itemData.expected_behavior || "",
+        referenceUrl: itemData.referenceUrl || itemData.reference_url || "",
       };
 
+      console.log("🔍 WorkItem from API:", displayWorkItem);
       console.log("📋 Form data to reset:", formData);
       form.reset(formData);
 
+      // CRITICAL: Double-check if the form actually reset with values
+      // Sometimes react-hook-form needs a tiny tick to reflect values from displayWorkItem
+      if (itemData.current_behavior || itemData.currentBehavior) {
+        form.setValue("currentBehavior", itemData.currentBehavior || itemData.current_behavior || "", { shouldDirty: true, shouldTouch: true });
+      }
+      if (itemData.expected_behavior || itemData.expectedBehavior) {
+        form.setValue("expectedBehavior", itemData.expectedBehavior || itemData.expected_behavior || "", { shouldDirty: true, shouldTouch: true });
+      }
+      if (itemData.bug_type || itemData.bugType) {
+        form.setValue("bugType", itemData.bugType || itemData.bug_type || "BUG", { shouldDirty: true, shouldTouch: true });
+      }
+
       // Verify form was reset
       setTimeout(() => {
+        // Force sync values to ensure they are present for validation
+        const currentVal = itemData.currentBehavior || itemData.current_behavior || "";
+        const expectedVal = itemData.expectedBehavior || itemData.expected_behavior || "";
+        const bugTypeVal = itemData.bugType || itemData.bug_type || "BUG";
+
+        if (currentVal) {
+          form.setValue("currentBehavior", currentVal, { shouldValidate: true, shouldDirty: true });
+        }
+        if (expectedVal) {
+          form.setValue("expectedBehavior", expectedVal, { shouldValidate: true, shouldDirty: true });
+        }
+        if (bugTypeVal) {
+          form.setValue("bugType", bugTypeVal, { shouldValidate: true, shouldDirty: true });
+        }
+
         console.log("📋 Form values after reset:", {
           bugType: form.getValues("bugType"),
           currentBehavior: form.getValues("currentBehavior"),
           expectedBehavior: form.getValues("expectedBehavior"),
           severity: form.getValues("severity"),
         });
-      }, 50);
+      }, 100);
     }
   }, [displayWorkItem, isOpen, form]);
 
@@ -314,8 +351,27 @@ export function EditItemModal({
       console.log("Final submitData:", submitData);
       console.log("Processed tags value:", submitData.tags);
       console.log("API endpoint:", `/work-items/${workItem.id}`);
-      console.log("=== MAKING API REQUEST ===");
+      
+      // Handle screenshot upload if a new file is selected
+      if (selectedFile) {
+        try {
+          const reader = new FileReader();
+          const base64String = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(selectedFile);
+          });
+          
+          (submitData as any).screenshot = null;
+          (submitData as any).screenshotBlob = base64String;
+          const timestamp = new Date().getTime();
+          (submitData as any).screenshotPath = `screenshot_${timestamp}_${selectedFile.name}`;
+        } catch (error) {
+          console.error("Error processing screenshot:", error);
+        }
+      }
 
+      console.log("=== MAKING API REQUEST ===");
       const response = await apiRequest("PATCH", `/work-items/${workItem.id}`, submitData);
 
       console.log("=== API RESPONSE ===");
@@ -459,29 +515,6 @@ export function EditItemModal({
                 <div className="grid grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Priority <span className="text-red-500">*</span></FormLabel>
-                        <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger className="h-9 text-sm">
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="LOW">Low</SelectItem>
-                            <SelectItem value="MEDIUM">Medium</SelectItem>
-                            <SelectItem value="HIGH">High</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="bugType"
                     render={({ field }) => (
                       <FormItem>
@@ -496,6 +529,29 @@ export function EditItemModal({
                             <SelectItem value="BUG">Bug (Low)</SelectItem>
                             <SelectItem value="DEFECT">Defect (Medium)</SelectItem>
                             <SelectItem value="PROD_INCIDENT">Prod Incident (High)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm">Priority <span className="text-red-500">*</span></FormLabel>
+                        <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="h-9 text-sm">
+                              <SelectValue placeholder="Select priority" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="LOW">Low</SelectItem>
+                            <SelectItem value="MEDIUM">Medium</SelectItem>
+                            <SelectItem value="HIGH">High</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -534,9 +590,22 @@ export function EditItemModal({
                     name="currentBehavior"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm">Current Behavior</FormLabel>
+                        <FormLabel className="text-sm">
+                          Current Behavior
+                          {(watchedBugType === 'DEFECT' || watchedBugType === 'PROD_INCIDENT') && <span className="text-red-500"> *</span>}
+                        </FormLabel>
                         <FormControl>
-                          <Textarea {...field} placeholder="What is happening?" rows={2} className="text-sm" value={field.value || ""} onChange={field.onChange} />
+                          <Textarea 
+                            {...field} 
+                            placeholder="What is happening?" 
+                            rows={2} 
+                            className="text-sm" 
+                            value={field.value || ""} 
+                            onChange={(e) => {
+                              field.onChange(e);
+                              form.trigger("currentBehavior");
+                            }} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -548,9 +617,22 @@ export function EditItemModal({
                     name="expectedBehavior"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm">Expected Behavior</FormLabel>
+                        <FormLabel className="text-sm">
+                          Expected Behavior
+                          {(watchedBugType === 'DEFECT' || watchedBugType === 'PROD_INCIDENT') && <span className="text-red-500"> *</span>}
+                        </FormLabel>
                         <FormControl>
-                          <Textarea {...field} placeholder="What should happen?" rows={2} className="text-sm" value={field.value || ""} onChange={field.onChange} />
+                          <Textarea 
+                            {...field} 
+                            placeholder="What should happen?" 
+                            rows={2} 
+                            className="text-sm" 
+                            value={field.value || ""} 
+                            onChange={(e) => {
+                              field.onChange(e);
+                              form.trigger("currentBehavior"); // currentBehavior holds the refinement error
+                            }} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -608,7 +690,7 @@ export function EditItemModal({
                         <label htmlFor="edit-screenshot-input" className="cursor-pointer">
                           <div className="text-neutral-600 dark:text-neutral-400">
                             {selectedFile ? (
-                              <div>
+                              <div className="relative group">
                                 <p className="font-medium text-green-600">{selectedFile.name}</p>
                                 <p className="text-sm">Click or drag to change</p>
                                 <img
@@ -616,13 +698,66 @@ export function EditItemModal({
                                   alt="Preview"
                                   className="max-h-32 mt-2 mx-auto border rounded"
                                 />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setSelectedFile(null);
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
                               </div>
-                            ) : workItem.screenshot ? (
-                              <div>
-                                <a href={workItem.screenshot} target="_blank" rel="noopener noreferrer">
-                                  <img src={workItem.screenshot} alt="Screenshot" className="max-h-32 border rounded mx-auto" />
-                                </a>
-                                <p className="text-sm mt-2">Drag and drop or click to change</p>
+                            ) : (displayWorkItem as any)?.screenshotBlob || (displayWorkItem as any)?.screenshot || (displayWorkItem as any)?.screenshot_blob ? (
+                              <div className="relative group">
+                                <div className="flex flex-col items-center">
+                                  <img 
+                                    src={(displayWorkItem as any).screenshotBlob || (displayWorkItem as any).screenshot || (displayWorkItem as any).screenshot_blob || ""} 
+                                    alt="Screenshot" 
+                                    className="max-h-32 border rounded mx-auto cursor-zoom-in" 
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      window.open((displayWorkItem as any).screenshotBlob || (displayWorkItem as any).screenshot || (displayWorkItem as any).screenshot_blob || "", '_blank');
+                                    }}
+                                  />
+                                  <p className="text-sm mt-2">Drag and drop or click to change</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    try {
+                                      await apiRequest("PATCH", `/work-items/${workItem.id}`, {
+                                        screenshot: null,
+                                        screenshotBlob: null,
+                                        screenshotPath: null
+                                      });
+                                      toast({
+                                        title: "Screenshot removed",
+                                        description: "The screenshot has been removed successfully.",
+                                      });
+                                      onSuccess();
+                                    } catch (error) {
+                                      console.error("Error removing screenshot:", error);
+                                      toast({
+                                        title: "Error",
+                                        description: "Could not remove screenshot.",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
                               </div>
                             ) : (
                               <div>

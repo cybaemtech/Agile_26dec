@@ -352,33 +352,74 @@ export class DatabaseStorage implements IStorage {
   async getWorkItem(id: number): Promise<WorkItem | undefined> {
     if (!db) return undefined;
     const [workItem] = await db.select().from(workItems).where(eq(workItems.id, id));
-    return workItem;
+    if (!workItem) return undefined;
+
+    // Backend Transformation: Map snake_case database columns to camelCase frontend properties
+    return {
+      ...workItem,
+      currentBehavior: workItem.current_behavior,
+      expectedBehavior: workItem.expected_behavior,
+      bugType: workItem.bug_type,
+      referenceUrl: workItem.reference_url,
+      screenshotBlob: workItem.screenshot_blob,
+      screenshotPath: workItem.screenshot_path,
+    } as any;
   }
 
   async getAllWorkItems(): Promise<WorkItem[]> {
     if (!db) return [];
-    return await db
+    const items = await db
       .select()
       .from(workItems)
       .orderBy(desc(workItems.updatedAt));
+    
+    return items.map(item => ({
+      ...item,
+      currentBehavior: item.current_behavior,
+      expectedBehavior: item.expected_behavior,
+      bugType: item.bug_type,
+      referenceUrl: item.reference_url,
+      screenshotBlob: item.screenshot_blob,
+      screenshotPath: item.screenshot_path,
+    })) as any;
   }
 
   async getWorkItemsByProject(projectId: number): Promise<WorkItem[]> {
     if (!db) return [];
-    return await db
+    const items = await db
       .select()
       .from(workItems)
       .where(eq(workItems.projectId, projectId))
       .orderBy(desc(workItems.updatedAt));
+
+    return items.map(item => ({
+      ...item,
+      currentBehavior: item.current_behavior,
+      expectedBehavior: item.expected_behavior,
+      bugType: item.bug_type,
+      referenceUrl: item.reference_url,
+      screenshotBlob: item.screenshot_blob,
+      screenshotPath: item.screenshot_path,
+    })) as any;
   }
 
   async getWorkItemsByParent(parentId: number): Promise<WorkItem[]> {
     if (!db) return [];
-    return await db
+    const items = await db
       .select()
       .from(workItems)
       .where(eq(workItems.parentId, parentId))
       .orderBy(desc(workItems.updatedAt));
+
+    return items.map(item => ({
+      ...item,
+      currentBehavior: item.current_behavior,
+      expectedBehavior: item.expected_behavior,
+      bugType: item.bug_type,
+      referenceUrl: item.reference_url,
+      screenshotBlob: item.screenshot_blob,
+      screenshotPath: item.screenshot_path,
+    })) as any;
   }
 
   async updateWorkItemStatus(id: number, status: string): Promise<WorkItem | undefined> {
@@ -421,7 +462,7 @@ export class DatabaseStorage implements IStorage {
     if (!db) return undefined;
     
     // Process date fields to ensure they're proper Date objects
-    const processedUpdates: Partial<WorkItem> = { ...updates };
+    const processedUpdates: any = { ...updates };
     
     // Handle startDate and endDate specifically
     if (updates.startDate && !(updates.startDate instanceof Date)) {
@@ -439,6 +480,16 @@ export class DatabaseStorage implements IStorage {
         processedUpdates.endDate = null;
       }
     }
+
+    // Map camelCase to snake_case for database updates if they come from frontend
+    if (updates.currentBehavior !== undefined) processedUpdates.current_behavior = updates.currentBehavior;
+    if (updates.expectedBehavior !== undefined) processedUpdates.expected_behavior = updates.expectedBehavior;
+    if (updates.bugType !== undefined) processedUpdates.bug_type = updates.bugType;
+    if (updates.referenceUrl !== undefined) processedUpdates.reference_url = updates.referenceUrl;
+    if (updates.screenshotBlob !== undefined) processedUpdates.screenshot_blob = updates.screenshotBlob;
+    
+    // Remove the camelCase versions before sending to DB to avoid potential errors if they aren't in schema
+    // Though Drizzle usually ignores unknown keys, being explicit is safer
     
     await db
       .update(workItems)
